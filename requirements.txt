@@ -1,0 +1,11 @@
+streamlit
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+Gensim
+underthesea
+jieba
+swifter
+scipy
