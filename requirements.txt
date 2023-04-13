@@ -9,3 +9,4 @@ underthesea
 jieba
 swifter
 scipy
+openpyxl
