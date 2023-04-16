@@ -15,6 +15,10 @@ from sklearn.metrics.pairwise import cosine_similarity
 import streamlit as st
 from scipy import sparse
 from PIL import Image
+import requests
+from io import BytesIO
+import urllib
+from io import StringIO
 
 
 
@@ -33,8 +37,10 @@ def load_data():
     tfidf_matrix_load = sparse.load_npz("cosine_similarity_matrix.npz")
     tf_model = pickle.load(open('tf_model.sav', 'rb'))
     category = data_load['sub_category'].unique()
-    image_no = Image.open('no-image-available.jpg')
-    ALS_df = pd.read_excel('ALS_prediction.xlsx',sheet_name = 0,engine = 'openpyxl')
+    image_no = Image.open('no-image-available.jpg').resize((600,400),Image.ANTIALIAS)
+    ALS_df = pd.read_excel('ALS_prediction.xlsx',sheet_name = 0,engine = 'openpyxl').dropna()
+    ALS_df['user_id'] = ALS_df['user_id'].apply(lambda x: str(int(x)))
+    ALS_df['product_id'] = ALS_df['product_id'].apply(lambda x: str(int(x)))
     return (data_load,products_gem,dictionary,index_vs_productid,tfidf_matrix_load,tf_model,category,image_no,ALS_df)
 #Load data
 data_load,products_gem,dictionary,index_vs_productid,tfidf_matrix_load,tf_model,category,image_no,ALS_df = load_data()
@@ -96,11 +102,13 @@ def suggest_product2(search_data, top=5, search_type='product_id'):
 
     return result
 
-def ALS_suggest(user_id):
+def ALS_suggest(user_id,top = 5):
 
     user_ALS = ALS_df[ALS_df['user_id'] == user_id]
+    user_ALS = user_ALS.sort_values('prediction',ascending = False)
+    user_ALS = user_ALS.iloc[0:top]
 
-    return user_ALS[['product_id','rating']]
+    return user_ALS
 
 
 # GUI
@@ -115,12 +123,37 @@ if choice == menu[0]:
     st.write('''+ Báo cáo gồm 2 phần :
     + Contentbase filtering sử dụng thuật toán Cosine
     + Colaborative sử dụng thuật toán ALS''')
+    scol =  st.sidebar.columns(3)
+    scol[1].image('TTTH.jpeg')
+    st.sidebar.write('')
+    st.sidebar.write('')
+    st.sidebar.write('')
+    st.sidebar.write('')
+    st.sidebar.write('''+ Thông tin :
+    + Học viên : Ngô Hoàng Nam
+    + Giáo viên : Khuất Thuỳ Phương
+    + Đề tài : Recomend System''')
+
 elif choice == menu[1]:
     st.subheader(menu[1])
+    st.sidebar.write('''+ Sơ lược phương pháp
+    + Ý tưởng chính của phương pháp này là đưa ra gợi ý dựa vào sự tương đồng với nhau giữa các sản phẩm.
+    + Sử dụng công thức''')
+    st.sidebar.image('cosine.png')
+
+    st.sidebar.write('''+ Chi tiết:
+    + Thư viện sử dụng : sklearn.metrics.pairwise.cosine_similarity
+    + Dữ liệu : Sử dụng các mô tả sản phẩm từ data của sàn thương mại điện tử của shop''')
+    st.sidebar.write('''+ Quy trình thực hiện:
+    + Bước 1: Clean bộ dữ liệu
+    + Bước 2: Training bằng cosine similarity
+    + Bước 3: Lưu lại model để tái sử dụng
+    + Bước 4: Viết lại các funtion để tái sử dụng''')
+
     type = st.radio("PLEASE INPUT COMMENT OR PRODUCT ID", options=("COMMENTS", "PRODUCT"))
     if type == 'COMMENTS':
         with st.form("my_form"):
-            slider = st.slider('How many suggest product do you need?', 5, 10, 5)
+            slider = st.slider('How many suggest product do you need?',5, 10, 5)
             input_data = st.text_area(label="input your content")
             submitted = st.form_submit_button("Submit")
         if submitted:
@@ -128,70 +161,115 @@ elif choice == menu[1]:
                 st.divider()
                 st.write("PRODUCT YOU SHOULD BUY :")
                 predict = suggest_product2(input_data, top=slider, search_type='comment')
-                suggest_id = predict['product_id']
-                with st.columns(3)[1]:
-                    num = 1
-                    for i in suggest_id:
-                        image = data_load[data_load['product_id'] == i]['image']
-                        product_name = data_load[data_load['product_id'] == i]['product_name']
-                        link = data_load[data_load['product_id'] == i]['link'].iloc[0]
+                suggest_id = predict['product_id'].tolist()
+                groups = []
+                n = 3
+                for i in range(0,len(suggest_id),n):
+                    groups.append(suggest_id[i:i+3])
+
+                cols = st.columns(n,gap="large")
+                container = st.container()
+                for group in groups:
+                    for i,groups in enumerate(group):
+                        image = data_load[data_load['product_id'] == group[i]]['image']
                         image = image.fillna(0).iloc[0]
+                        product_name = data_load[data_load['product_id'] == group[i]]['product_name'].iloc[0]
+                        link = data_load[data_load['product_id'] == group[i]]['link'].iloc[0]
+                        price = data_load[data_load['product_id'] == group[i]]['price'].iloc[0]
+                        rating = data_load[data_load['product_id'] == group[i]]['rating'].iloc[0]
                         if image == 0:
-                            st.write('Product number {}'.format(num))
-                            st.image(image_no, caption=st.write("[{0}]({1})".format(product_name,link)))
-                            st.divider()
+                            cols[i].image(image_no)
                         else:
-                            st.write('Product number {}'.format(num))
-                            st.image(image, caption=st.write("[{0}]({1})".format(product_name,link)))
-                            st.divider()
-                        num += 1
-
-
+                            response = requests.get(image)
+                            image_bytes = BytesIO(response.content)
+                            img = Image.open(image_bytes).resize((600,400),Image.ANTIALIAS)
+                            cols[i].image(img)
+                        cols[i].markdown("[{0}]({1})".format(product_name, link))
+                        cols[i].markdown("Price :{} VND, rating {}/5".format(price,rating))
 
     elif type == 'PRODUCT':
         category_box = st.selectbox(label="Choose your category", options=category)
         with st.form("my_form"):
-            product_id = data_load[data_load['sub_category']==category_box]['product_id'].unique()
+            product_id = data_load[data_load['sub_category']==category_box]['add']
             productid_box = st.selectbox(label = "Choose your product_id",options= product_id)
-            image = data_load[data_load['product_id']==productid_box]['image'].fillna(0).iloc[0]
-            link = data_load[data_load['product_id']==productid_box]['link'].iloc[0]
+            productid_box2 = int(productid_box.split('---')[0])
             slider = st.slider('How many suggest product do you need?', 5, 10, 5)
             submitted = st.form_submit_button("Submit")
         if submitted:
             st.divider()
-            st.write("YOUR PRODUCT IS :")
-            with st.columns(3)[1]:
-                if image == 0:
-                    st.image(image_no, caption=st.write("[Product link from shoppee]({0})".format(link)))
-                else:
-                    st.image(image, caption=st.write("[Product link from shoppee]({0})".format(link)))
-            st.divider()
-            predict = suggest_product2(productid_box, top=slider, search_type='product_id')
-            suggest_id = predict['product_id']
-            st.write("PRODUCT YOU SHOULD BUY :")
-            with st.columns(3)[1]:
-                num = 1
-                for i in suggest_id:
-                    image = data_load[data_load['product_id'] == i]['image']
-                    link = data_load[data_load['product_id'] == i]['link'].iloc[0]
+            st.write("PRODUCT YOU SHOULD BUY IS :")
+            predict = suggest_product2(productid_box2, top=slider, search_type='product_id')
+            suggest_id = predict['product_id'].tolist()
+            groups = []
+            n = 3
+            for i in range(0, len(suggest_id), n):
+                groups.append(suggest_id[i:i + 3])
+
+            cols = st.columns(n, gap="large")
+            for group in groups:
+                for i, groups in enumerate(group):
+                    image = data_load[data_load['product_id'] == group[i]]['image']
                     image = image.fillna(0).iloc[0]
+                    product_name = data_load[data_load['product_id'] == group[i]]['product_name'].iloc[0]
+                    link = data_load[data_load['product_id'] == group[i]]['link'].iloc[0]
+                    price = data_load[data_load['product_id'] == group[i]]['price'].iloc[0]
+                    rating = data_load[data_load['product_id'] == group[i]]['rating'].iloc[0]
                     if image == 0:
-                        st.write('Product number {}'.format(num))
-                        st.image(image_no, caption=st.write("[Product link from shoppee]({0})".format(link)))
-                        st.divider()
-                    else :
-                        st.write('Product number {}'.format(num))
-                        st.image(image, caption=st.write("[Product link from shoppee]({0})".format(link)))
-                        st.divider()
-                    num += 1
+                        cols[i].image(image_no)
+                    else:
+                        response = requests.get(image)
+                        image_bytes = BytesIO(response.content)
+                        img = Image.open(image_bytes).resize((600, 400), Image.ANTIALIAS)
+                        cols[i].image(img)
+                    cols[i].markdown("[{0}]({1})".format(product_name, link))
+                    cols[i].markdown("Price :{} VND, rating {}/5".format(price, rating))
+
 
 elif choice == menu[2]:
+    st.sidebar.write('''+ Chi tiết:
+    + Thư viện sử dụng : pyspark.ml.recommendation.ALS
+    + Dữ liệu : Sử dụng các mô tả sản phẩm từ data của sàn thương mại điện tử của shop''')
+    st.sidebar.write('''+ Quy trình thực hiện:
+    + Bước 1: Clean bộ dữ liệu
+    + Bước 2: Training bằng ALS (thông số maxIter=15, regParam=0.15,rank = 25, coldStartStrategy="drop", nonnegative=True)
+    + Bước 3: Lưu lại model để tái sử dụng
+    + Bước 4: Viết lại các funtion để tái sử dụng''')
+    st.sidebar.write('''+ Kết quả mô hình :
+    + RMSE = 1.07
+    + Thời gian huấn luyện : 7 phút''')
     st.subheader(menu[2])
     with st.form("my_form"):
         user_id = st.selectbox("INPUT YOUR CUSTOMER ID:",ALS_df['user_id'].unique())
+        slider = st.slider('How many suggest product do you need?', 5, 10, 5)
         submitted = st.form_submit_button("Submit")
     if submitted:
         st.write('Product you should buy')
-        suggest = ALS_suggest(user_id)
-        st.dataframe(suggest)
+        suggest = ALS_suggest(user_id,top = slider)
+        st.dataframe(suggest[['user_id','product_id','prediction']])
+        groups = []
+        n = 3
+        product_list = suggest['product_id'].tolist()
+        for i in range(0, len(product_list), n):
+            groups.append(product_list[i:i + 3])
+
+        cols = st.columns(n, gap="large")
+        for group in groups:
+            for i, groups in enumerate(group):
+                image = suggest[suggest['product_id'] == group[i]]['image']
+                image = image.fillna(0).iloc[0]
+                product_name = suggest[suggest['product_id'] == group[i]]['product_name'].iloc[0]
+                link = suggest[suggest['product_id'] == group[i]]['link'].iloc[0]
+                price = suggest[suggest['product_id'] == group[i]]['price'].iloc[0]
+                rating = suggest[suggest['product_id'] == group[i]]['prediction'].iloc[0]
+                if image == 0:
+                    cols[i].image(image_no)
+                else:
+                    response = requests.get(image)
+                    image_bytes = BytesIO(response.content)
+                    img = Image.open(image_bytes).resize((600, 400), Image.ANTIALIAS)
+                    cols[i].image(img)
+                cols[i].markdown("[{0}]({1})".format(product_name, link))
+                cols[i].markdown("Price :{} VND, rating {}/5".format(price, round(rating,2)))
+
+
 
