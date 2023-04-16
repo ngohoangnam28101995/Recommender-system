@@ -133,15 +133,16 @@ elif choice == menu[1]:
                     num = 1
                     for i in suggest_id:
                         image = data_load[data_load['product_id'] == i]['image']
+                        product_name = data_load[data_load['product_id'] == i]['product_name']
                         link = data_load[data_load['product_id'] == i]['link'].iloc[0]
                         image = image.fillna(0).iloc[0]
                         if image == 0:
                             st.write('Product number {}'.format(num))
-                            st.image(image_no, caption=st.write("[Product link from shoppee]({0})".format(link)))
+                            st.image(image_no, caption=st.write("[{0}]({1})".format(product_name,link)))
                             st.divider()
                         else:
                             st.write('Product number {}'.format(num))
-                            st.image(image, caption=st.write("[Product link from shoppee]({0})".format(link)))
+                            st.image(image, caption=st.write("[{0}]({1})".format(product_name,link)))
                             st.divider()
                         num += 1
 
