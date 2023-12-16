@@ -37,7 +37,7 @@ def load_data():
     tfidf_matrix_load = sparse.load_npz("cosine_similarity_matrix.npz")
     tf_model = pickle.load(open('tf_model.sav', 'rb'))
     category = data_load['sub_category'].unique()
-    image_no = Image.open('no-image-available.jpg').resize((600,400),Image.ANTIALIAS)
+    image_no = Image.open('no-image-available.jpg').resize((600,400),Image.LANCZOS)
     ALS_df = pd.read_excel('ALS_prediction.xlsx',sheet_name = 0,engine = 'openpyxl').dropna()
     ALS_df['user_id'] = ALS_df['user_id'].apply(lambda x: str(int(x)))
     ALS_df['product_id'] = ALS_df['product_id'].apply(lambda x: str(int(x)))
@@ -182,7 +182,7 @@ elif choice == menu[1]:
                         else:
                             response = requests.get(image)
                             image_bytes = BytesIO(response.content)
-                            img = Image.open(image_bytes).resize((600,400),Image.ANTIALIAS)
+                            img = Image.open(image_bytes).resize((600,400),Image.LANCZOS)
                             cols[i].image(img)
                         cols[i].markdown("[{0}]({1})".format(product_name, link))
                         cols[i].markdown("Price :{} VND, rating {}/5".format(price,rating))
@@ -219,7 +219,7 @@ elif choice == menu[1]:
                     else:
                         response = requests.get(image)
                         image_bytes = BytesIO(response.content)
-                        img = Image.open(image_bytes).resize((600, 400), Image.ANTIALIAS)
+                        img = Image.open(image_bytes).resize((600, 400), Image.LANCZOS)
                         cols[i].image(img)
                     cols[i].markdown("[{0}]({1})".format(product_name, link))
                     cols[i].markdown("Price :{} VND, rating {}/5".format(price, rating))
@@ -266,7 +266,7 @@ elif choice == menu[2]:
                 else:
                     response = requests.get(image)
                     image_bytes = BytesIO(response.content)
-                    img = Image.open(image_bytes).resize((600, 400), Image.ANTIALIAS)
+                    img = Image.open(image_bytes).resize((600, 400), Image.LANCZOS)
                     cols[i].image(img)
                 cols[i].markdown("[{0}]({1})".format(product_name, link))
                 cols[i].markdown("Price :{} VND, rating {}/5".format(price, round(rating,2)))
